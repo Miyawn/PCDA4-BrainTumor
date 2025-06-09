@@ -1,0 +1,10 @@
+txt
+streamlit
+opencv-python
+scikit-image
+matplotlib
+seaborn
+pandas
+numpy
+scikit-learn
+scipy
