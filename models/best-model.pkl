@@ -1,0 +1,13 @@
+import pickle
+# Asumsikan 'classifiers' adalah dictionary model terlatih Anda dan 'best_classifier' adalah nama model terbaik
+best_model = classifiers[best_classifier]
+
+# Pastikan folder 'models' sudah ada atau buatlah
+import os
+if not os.path.exists('models'):
+    os.makedirs('models')
+
+with open('models/best_model.pkl', 'wb') as f:
+    pickle.dump(best_model, f)
+
+print("Model terbaik berhasil disimpan di models/best_model.pkl")

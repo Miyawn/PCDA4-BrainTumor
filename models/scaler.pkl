@@ -1,0 +1,22 @@
+import pickle
+# Asumsikan 'scaler' adalah objek StandardScaler yang sudah di-fit
+# from sklearn.preprocessing import StandardScaler
+# scaler = StandardScaler()
+# X_train_scaled = scaler.fit_transform(X_train) # Fit scaler di data training
+ try:
+        with open('models/best_model.pkl', 'rb') as f:
+            loaded_model_test = pickle.load(f)
+        with open('models/scaler.pkl', 'rb') as f:
+            loaded_scaler_test = pickle.load(f)
+        print("Model dan scaler berhasil dimuat kembali di Colab.")
+    except Exception as e:
+        print(f"Error saat memuat kembali di Colab: {e}")
+# Pastikan folder 'models' sudah ada
+import os
+if not os.path.exists('models'):
+    os.makedirs('models')
+
+with open('models/scaler.pkl', 'wb') as f:
+    pickle.dump(scaler, f)
+
+print("Scaler berhasil disimpan di models/scaler.pkl")
