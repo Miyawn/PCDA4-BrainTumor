@@ -52,6 +52,110 @@ def preprocess_single_image(image, target_size=(128, 128)):
     normalized = normalize_image(enhanced, 'minmax')
     return normalized
 
+# --- Fungsi Preprocessing dengan Visualisasi ---
+def preprocess_with_visualization(image, target_size=(128, 128)):
+    """Preprocessing dengan menyimpan setiap tahap untuk visualisasi"""
+    if len(image.shape) == 3:
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    else:
+        gray_image = image.copy()
+    
+    # Resize ke ukuran target
+    resized = cv2.resize(gray_image, target_size)
+    
+    # Noise reduction techniques
+    gaussian_blur = noise_reduction(resized, 'gaussian')
+    median_blur = noise_reduction(resized, 'median')
+    bilateral_blur = noise_reduction(resized, 'bilateral')
+    
+    # Contrast enhancement techniques
+    clahe_enhanced = enhance_contrast(gaussian_blur, 'clahe')
+    hist_eq_enhanced = enhance_contrast(gaussian_blur, 'hist_eq')
+    
+    # Normalization
+    normalized = normalize_image(clahe_enhanced, 'minmax')
+    
+    return {
+        'original': resized,
+        'gaussian_blur': gaussian_blur,
+        'median_blur': median_blur,
+        'bilateral_blur': bilateral_blur,
+        'clahe_enhanced': clahe_enhanced,
+        'hist_eq_enhanced': hist_eq_enhanced,
+        'normalized': normalized
+    }
+
+# --- Fungsi Image Transformation ---
+def apply_edge_detection(image):
+    """Deteksi tepi menggunakan berbagai teknik"""
+    # Canny edge detection
+    canny_edges = cv2.Canny(image, 50, 150)
+    
+    # Sobel edge detection
+    sobel_x = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=3)
+    sobel_y = cv2.Sobel(image, cv2.CV_64F, 0, 1, ksize=3)
+    sobel_combined = np.sqrt(sobel_x**2 + sobel_y**2)
+    sobel_combined = np.uint8(np.clip(sobel_combined, 0, 255))
+    
+    # Laplacian edge detection
+    laplacian = cv2.Laplacian(image, cv2.CV_64F)
+    laplacian = np.uint8(np.absolute(laplacian))
+    
+    return {
+        'canny': canny_edges,
+        'sobel': sobel_combined,
+        'laplacian': laplacian
+    }
+
+def apply_morphological_operations(image):
+    """Operasi morfologi untuk membersihkan noise"""
+    # Buat binary image terlebih dahulu
+    _, binary = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
+    
+    # Define kernels
+    kernel_small = np.ones((3,3), np.uint8)
+    kernel_medium = np.ones((5,5), np.uint8)
+    
+    # Morphological operations
+    erosion = cv2.erode(binary, kernel_small, iterations=1)
+    dilation = cv2.dilate(binary, kernel_small, iterations=1)
+    opening = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel_medium)
+    closing = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel_medium)
+    
+    return {
+        'binary': binary,
+        'erosion': erosion,
+        'dilation': dilation,
+        'opening': opening,
+        'closing': closing
+    }
+
+def apply_segmentation_techniques(image):
+    """Teknik segmentasi berbeda"""
+    segmentations = {}
+    
+    # Otsu Thresholding
+    _, otsu = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    segmentations['otsu'] = otsu
+    
+    # Adaptive Thresholding
+    adaptive = cv2.adaptiveThreshold(image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                   cv2.THRESH_BINARY, 11, 2)
+    segmentations['adaptive'] = adaptive
+    
+    # K-Means Clustering
+    data = image.reshape((-1, 1))
+    data = np.float32(data)
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
+    ret, labels, centers = cv2.kmeans(data, 2, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+    kmeans_result = labels.reshape(image.shape)
+    if centers[0] > centers[1]:
+        segmentations['kmeans'] = np.uint8(kmeans_result * 255)
+    else:
+        segmentations['kmeans'] = np.uint8((1 - kmeans_result) * 255)
+    
+    return segmentations
+
 # --- Fungsi Feature Extraction ---
 def extract_texture_features(image):
     distances = [1, 2]
@@ -252,6 +356,158 @@ def predict_brain_tumor(image_array, model_package):
     except Exception as e:
         return {'error': str(e)}
 
+# --- Fungsi untuk menampilkan visualisasi preprocessing ---
+def display_preprocessing_steps(image_array):
+    """Menampilkan setiap tahap preprocessing"""
+    st.subheader("🔧 Tahapan Image Preprocessing")
+    
+    # Dapatkan hasil preprocessing
+    preprocessing_results = preprocess_with_visualization(image_array)
+    
+    # Penjelasan teknik
+    st.markdown("""
+    **Teknik noise reduction** seperti Gaussian dan median filter dipilih untuk mengurangi gangguan sinyal (noise) yang umum muncul 
+    akibat proses pengambilan gambar MRI tanpa menghilangkan informasi penting. **Contrast enhancement** seperti CLAHE 
+    (Contrast Limited Adaptive Histogram Equalization) digunakan karena kontras yang rendah pada beberapa bagian otak dapat 
+    menyulitkan dalam mengamati struktur tumor secara jelas. **Normalisasi** digunakan untuk menyeragamkan rentang intensitas 
+    antar citra, yang sangat penting agar model analisis berikutnya tidak bias terhadap nilai intensitas tertentu.
+    """)
+    
+    # Tampilkan original image
+    st.write("#### 📷 Gambar Original (Grayscale & Resized)")
+    col1, col2, col3 = st.columns(3)
+    with col2:
+        st.image(preprocessing_results['original'], caption='Gambar Original (128x128)', use_container_width=True, clamp=True)
+    
+    # Noise Reduction Techniques
+    st.write("#### 🔍 Noise Reduction Techniques")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.image(preprocessing_results['gaussian_blur'], 
+                caption='Gaussian Blur\n(Mengurangi noise dengan blur yang merata)', 
+                use_container_width=True, clamp=True)
+    
+    with col2:
+        st.image(preprocessing_results['median_blur'], 
+                caption='Median Filter\n(Efektif untuk salt-and-pepper noise)', 
+                use_container_width=True, clamp=True)
+    
+    with col3:
+        st.image(preprocessing_results['bilateral_blur'], 
+                caption='Bilateral Filter\n(Mempertahankan tepi sambil mengurangi noise)', 
+                use_container_width=True, clamp=True)
+    
+    # Contrast Enhancement
+    st.write("#### ✨ Contrast Enhancement Techniques")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.image(preprocessing_results['clahe_enhanced'], 
+                caption='CLAHE (Contrast Limited Adaptive Histogram Equalization)\nMeningkatkan kontras lokal tanpa over-amplification', 
+                use_container_width=True, clamp=True)
+    
+    with col2:
+        st.image(preprocessing_results['hist_eq_enhanced'], 
+                caption='Histogram Equalization\nMeratakan distribusi intensitas global', 
+                use_container_width=True, clamp=True)
+    
+    # Final Normalized Image
+    st.write("#### 📏 Normalization")
+    col1, col2, col3 = st.columns(3)
+    with col2:
+        st.image(preprocessing_results['normalized'], 
+                caption='Normalized Image (Min-Max Scaling)\nMenyeragamkan rentang intensitas 0-255', 
+                use_container_width=True, clamp=True)
+    
+    return preprocessing_results['normalized']
+
+def display_transformation_steps(processed_image):
+    """Menampilkan tahapan image transformation"""
+    st.subheader("🔄 Image Transformation & Feature Extraction")
+    
+    st.markdown("""
+    Setelah preprocessing, dilakukan **image transformation** untuk mengekstrak fitur visual penting. **Edge detection** seperti Canny dan Sobel 
+    digunakan karena batas tumor biasanya muncul dalam bentuk perubahan intensitas yang tajam. **Morphological operations** dipilih untuk 
+    membersihkan noise setelah segmentasi dan memperjelas bentuk objek. **Segmentation techniques** seperti Otsu Thresholding dan K-Means 
+    Clustering diterapkan untuk memisahkan area tumor dari latar belakang, sehingga informasi spasial tumor bisa dianalisis lebih lanjut.
+    """)
+    
+    # Edge Detection
+    st.write("#### 🔍 Edge Detection Techniques")
+    edge_results = apply_edge_detection(processed_image)
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.image(edge_results['canny'], 
+                caption='Canny Edge Detection\nMendeteksi tepi dengan noise reduction dan hysteresis', 
+                use_container_width=True, clamp=True)
+    
+    with col2:
+        st.image(edge_results['sobel'], 
+                caption='Sobel Edge Detection\nMendeteksi gradien intensitas dalam arah X dan Y', 
+                use_container_width=True, clamp=True)
+    
+    with col3:
+        st.image(edge_results['laplacian'], 
+                caption='Laplacian Edge Detection\nMendeteksi perubahan intensitas kedua (second derivative)', 
+                use_container_width=True, clamp=True)
+    
+    # Morphological Operations
+    st.write("#### 🔬 Morphological Operations")
+    morph_results = apply_morphological_operations(processed_image)
+    
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    with col1:
+        st.image(morph_results['binary'], 
+                caption='Binary Image\nThreshold dasar untuk operasi morfologi', 
+                use_container_width=True, clamp=True)
+    
+    with col2:
+        st.image(morph_results['erosion'], 
+                caption='Erosion\nMengecilkan objek putih', 
+                use_container_width=True, clamp=True)
+    
+    with col3:
+        st.image(morph_results['dilation'], 
+                caption='Dilation\nMemperbesar objek putih', 
+                use_container_width=True, clamp=True)
+    
+    with col4:
+        st.image(morph_results['opening'], 
+                caption='Opening\nMenghilangkan noise kecil', 
+                use_container_width=True, clamp=True)
+    
+    with col5:
+        st.image(morph_results['closing'], 
+                caption='Closing\nMengisi lubang kecil dalam objek', 
+                use_container_width=True, clamp=True)
+    
+    # Segmentation Techniques
+    st.write("#### 🎯 Segmentation Techniques")
+    seg_results = apply_segmentation_techniques(processed_image)
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.image(seg_results['otsu'], 
+                caption='Otsu Thresholding\nOtomatis menentukan threshold optimal', 
+                use_container_width=True, clamp=True)
+    
+    with col2:
+        st.image(seg_results['adaptive'], 
+                caption='Adaptive Thresholding\nThreshold berbeda untuk setiap region', 
+                use_container_width=True, clamp=True)
+    
+    with col3:
+        st.image(seg_results['kmeans'], 
+                caption='K-Means Clustering\nPengelompokan pixel berdasarkan intensitas', 
+                use_container_width=True, clamp=True)
+    
+    return seg_results['otsu']  # Return segmented image for feature extraction
+
 # --- Main App ---
 def main():
     st.title("🧠 Deteksi Tumor Otak dari Citra MRI")
@@ -282,107 +538,147 @@ def main():
                     st.write(f"• {cls.title()}")
     
     # Main content
-    col1, col2 = st.columns([1, 1])
+    st.header("📤 Unggah Gambar MRI")
+    uploaded_file = st.file_uploader(
+        "Pilih gambar MRI...", 
+        type=["jpg", "jpeg", "png"],
+        help="Unggah gambar scan MRI otak dalam format grayscale atau berwarna"
+    )
     
-    with col1:
-        st.header("📤 Unggah Gambar MRI")
-        uploaded_file = st.file_uploader(
-            "Pilih gambar MRI...", 
-            type=["jpg", "jpeg", "png"],
-            help="Unggah gambar scan MRI otak dalam format grayscale atau berwarna"
-        )
+    if uploaded_file is not None:
+        # Read and display original image
+        image = Image.open(uploaded_file)
+        image_array = np.array(image)
         
-        if uploaded_file is not None:
-            # Read and display original image
-            image = Image.open(uploaded_file)
-            image_array = np.array(image)
-            
+        # Convert PIL to OpenCV format
+        if len(image_array.shape) == 3:
+            opencv_image = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
+        else:
+            opencv_image = image_array
+        
+        # Display original image
+        st.subheader("📷 Gambar MRI Original")
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
             st.image(image, caption='Gambar MRI Asli', use_container_width=True)
-            
-            # Convert PIL to OpenCV format
-            if len(image_array.shape) == 3:
-                opencv_image = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
-            else:
-                opencv_image = image_array
-    
-    with col2:
-        if uploaded_file is not None and model_loaded:
-            st.header("🔍 Hasil Analisis")
-            
+        
+        # Display preprocessing steps
+        processed_image = display_preprocessing_steps(opencv_image)
+        
+        # Display transformation steps
+        segmented_image = display_transformation_steps(processed_image)
+        
+        # Prediction section
+        if model_loaded:
+            st.header("🔍 Hasil Analisis dan Prediksi")
+
             with st.spinner("Memproses gambar dan mengekstraksi fitur..."):
                 result = predict_brain_tumor(opencv_image, model_package)
-            
+
             if 'error' not in result:
-                # Display prediction
-                predicted_class = result['predicted_class']
-                confidence = result['confidence']
-                
-                if predicted_class in ['notumor', 'normal']:
-                    st.success(f"✅ **Tidak Ada Tumor Terdeteksi**")
-                    st.success(f"Tingkat Kepercayaan: {confidence:.2%}")
-                else:
-                    st.warning(f"⚠️ **{predicted_class.title()} Terdeteksi**")
-                    st.warning(f"Tingkat Kepercayaan: {confidence:.2%}")
-                
-                # Show probabilities
-                st.subheader("📊 Probabilitas Klasifikasi")
-                prob_df = pd.DataFrame(
-                    list(result['probabilities'].items()),
-                    columns=['Kelas', 'Probabilitas']
-                )
-                # Translate class names to Indonesian
-                class_translation = {
-                    'notumor': 'Normal (Tanpa Tumor)',
-                    'normal': 'Normal (Tanpa Tumor)',
-                    'glioma': 'Glioma',
-                    'meningioma': 'Meningioma',
-                    'pituitary': 'Pituitary'
-                }
-                prob_df['Kelas'] = prob_df['Kelas'].map(class_translation).fillna(prob_df['Kelas'])
-                prob_df = prob_df.sort_values('Probabilitas', ascending=False)
-                
-                # Create bar chart
-                fig, ax = plt.subplots(figsize=(8, 4))
-                bars = ax.barh(prob_df['Kelas'], prob_df['Probabilitas'])
-                ax.set_xlabel('Probabilitas')
-                ax.set_xlim(0, 1)
-                
-                # Color bars
-                colors = ['green' if 'Normal' in cls else 'red' for cls in prob_df['Kelas']]
-                for bar, color in zip(bars, colors):
-                    bar.set_color(color)
-                    bar.set_alpha(0.7)
-                
-                plt.tight_layout()
-                st.pyplot(fig)
-                
-                # Show processed images
-                st.subheader("🖼️ Tahapan Pemrosesan Gambar")
-                
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.image(result['processed_image'], 
-                            caption='Gambar Setelah Preprocessing', 
-                            use_container_width=True, 
-                            clamp=True)
-                
-                with col_b:
-                    st.image(result['segmented_image'], 
-                            caption='Gambar Tersegmentasi', 
-                            use_container_width=True, 
-                            clamp=True)
-                
-                # Feature information
-                with st.expander("🔬 Analisis Fitur"):
-                    st.write(f"**Total Fitur yang Diekstraksi**: {len(result['features'])}")
-                    st.write("- Fitur Tekstur: 10 (berbasis GLCM)")
-                    st.write("- Fitur Bentuk: 10 (berbasis Kontur)")
-                    st.write("- Fitur Intensitas: 7 (Statistik)")
-                
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    predicted_class = result['predicted_class']
+                    confidence = result['confidence']
+
+                    if predicted_class in ['notumor', 'normal']:
+                        st.success(f"✅ **Tidak Ada Tumor Terdeteksi**")
+                        st.success(f"Tingkat Kepercayaan: {confidence:.2%}")
+                    else:
+                        st.warning(f"⚠️ **{predicted_class.title()} Terdeteksi**")
+                        st.warning(f"Tingkat Kepercayaan: {confidence:.2%}")
+
+                with col2:
+                    st.subheader("📊 Probabilitas Klasifikasi")
+                    prob_df = pd.DataFrame(
+                        list(result['probabilities'].items()),
+                        columns=['Kelas', 'Probabilitas']
+                    )
+
+                    class_translation = {
+                        'notumor': 'Normal (Tanpa Tumor)',
+                        'normal': 'Normal (Tanpa Tumor)',
+                        'glioma': 'Glioma',
+                        'meningioma': 'Meningioma',
+                        'pituitary': 'Pituitary'
+                    }
+                    prob_df['Kelas'] = prob_df['Kelas'].map(class_translation).fillna(prob_df['Kelas'])
+                    prob_df = prob_df.sort_values('Probabilitas', ascending=False)
+
+                    fig, ax = plt.subplots(figsize=(8, 4))
+                    bars = ax.barh(prob_df['Kelas'], prob_df['Probabilitas'])
+                    ax.set_xlabel('Probabilitas')
+                    ax.set_xlim(0, 1)
+
+                    colors = ['green' if 'Normal' in cls else 'red' for cls in prob_df['Kelas']]
+                    for bar, color in zip(bars, colors):
+                        bar.set_color(color)
+                        bar.set_alpha(0.7)
+
+                    plt.tight_layout()
+                    st.pyplot(fig)
+
+                # Analisis fitur
+                st.subheader("🔬 Analisis Fitur yang Diekstraksi")
+                st.write(f"**Total Fitur yang Diekstraksi**: {len(result['features'])}")
+
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+                    st.markdown("**🎨 Fitur Tekstur (10 fitur)**")
+                    st.write("- Contrast")
+                    st.write("- Dissimilarity") 
+                    st.write("- Homogeneity")
+                    st.write("- Energy")
+                    st.write("- Correlation")
+                    st.write("*Berbasis Gray Level Co-occurrence Matrix (GLCM)*")
+
+                with col2:
+                    st.markdown("**📐 Fitur Bentuk (10 fitur)**")
+                    st.write("- Area")
+                    st.write("- Perimeter")
+                    st.write("- Compactness")
+                    st.write("- Aspect Ratio")
+                    st.write("- Extent")
+                    st.write("- Solidity")
+                    st.write("- Equivalent Diameter")
+                    st.write("- Centroid (X, Y)")
+                    st.write("- Eccentricity")
+                    st.write("*Berbasis analisis kontur*")
+
+                with col3:
+                    st.markdown("**💡 Fitur Intensitas (7 fitur)**")
+                    st.write("- Mean Intensity")
+                    st.write("- Standard Deviation")
+                    st.write("- Min/Max Intensity")
+                    st.write("- Entropy")
+                    st.write("- Skewness")
+                    st.write("- Kurtosis")
+                    st.write("*Berbasis statistik histogram*")
+
+                # Tampilkan ringkasan nilai fitur
+                st.markdown("#### 📈 Nilai Fitur yang Diekstraksi")
+                feature_names = ['Contrast', 'Dissimilarity', 'Homogeneity', 'Energy', 'Correlation'] * 2 + \
+                                ['Area', 'Perimeter', 'Compactness', 'Aspect_Ratio', 'Extent',
+                                'Solidity', 'Equiv_Diameter', 'Centroid_X', 'Centroid_Y', 'Eccentricity'] + \
+                                ['Mean_Intensity', 'Std_Intensity', 'Min_Intensity', 'Max_Intensity',
+                                'Entropy', 'Skewness', 'Kurtosis']
+
+                features_df = pd.DataFrame({
+                    'Fitur': feature_names[:len(result['features'])],
+                    'Nilai': result['features']
+                })
+
+                st.dataframe(features_df.head(15), use_container_width=True)
+
+                if len(features_df) > 15:
+                    with st.expander("📄 Lihat Semua Fitur"):
+                        st.dataframe(features_df, use_container_width=True)
+
             else:
                 st.error(f"Kesalahan saat prediksi: {result['error']}")
-        
-        elif uploaded_file is not None and not model_loaded:
+        else:
             st.error("Tidak dapat melakukan prediksi - model belum dimuat")
     
     # Footer
