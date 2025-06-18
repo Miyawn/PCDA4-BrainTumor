@@ -1,0 +1,10 @@
+[theme]
+primaryColor = "#F48FB1"             # Pink Rose
+backgroundColor = "#FFF0F6"          # Blush Tint
+secondaryBackgroundColor = "#FCE4EC" # Light Pink
+textColor = "#F06292"                # Warm Pink
+accent = "#F06292"                   # Warm Pink
+
+[server]
+headless = true
+enableCORS = false
