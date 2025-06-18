@@ -1,15 +1,3 @@
-<<<<<<< HEAD
-txt
-streamlit
-opencv-python
-scikit-image
-matplotlib
-seaborn
-pandas
-numpy
-scikit-learn
-scipy
-=======
 streamlit==1.28.0
 opencv-python==4.8.1.78
 scikit-image==0.25.2
@@ -21,4 +9,3 @@ seaborn==0.12.2
 joblib==1.3.2
 pillow==10.0.0
 scipy==1.11.1
->>>>>>> 3a8c3a58a8e1bd428a0c3625ca942311054403e3
