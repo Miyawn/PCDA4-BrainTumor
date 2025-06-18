@@ -285,6 +285,22 @@ st.markdown("""
         margin-top: 20px;
         margin-bottom: 20px;
     }
+            
+    /* --- CSS DEBUGGING UNTUK SIDEBAR --- */
+
+    /* TUJUAN: Menghilangkan tombol panah '<' di dalam sidebar (dengan paksa) */
+    [data-testid="stSidebarCollapseButton"] {
+        display: none !important;
+    }
+
+    /* TUJUAN: Menghilangkan Scrollbar di Sidebar */
+    [data-testid="stSidebarContent"]::-webkit-scrollbar {
+        display: none !important;
+    }
+    [data-testid="stSidebarContent"] {
+        -ms-overflow-style: none !important;
+        scrollbar-width: none !important;
+    }
 
     </style>
 """, unsafe_allow_html=True)
